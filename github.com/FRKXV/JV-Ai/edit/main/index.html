@@ -384,7 +384,7 @@ window.openWsFor=pid=>{if(!st.ws.ctx.includes(pid))st.ws.ctx.push(pid);nav('work
 window.resetKeys=()=>{if(!confirm('Resettare le API key?'))return;S.del('vKey');S.del('jKey');nav('setup');};
 
 // ── Workspace ─────────────────────────────────────────────
-const MODES=[{id:'sequential',ic:'⟶',lb:'Sequenziale'},{id:'debate',ic:'⚡',lb:'Dibattito'},{id:'parallel',ic:'⫿',lb:'Parallelo'}];
+const MODES=[{id:'sequential',ic:'⟶',lb:'Sequenziale'},{id:'debate',ic:'⚡',lb:'Dibattito'},{id:'parallel',ic:'⫿',lb:'Parallelo'},{id:'shortlist',ic:'◈',lb:'Shortlist'}];
 
 function rWs(){
   const ws=st.ws;
@@ -474,6 +474,22 @@ async function runWs(task){
     ws.lr='virgilio';updTyp();
     const v2=await callV(buildSys('virgilio',ctx),[{role:'user',content:`Jarvis risponde:\n${j1}\n\nControreplica finale su "${task}".`}]);
     appendMsg('virgilio',v2);
+  }else if(ws.mode==='shortlist'){
+    ws.lr='both';updTyp();
+    const[v1,j1]=await Promise.all([
+      callV(buildSys('virgilio',ctx),[{role:'user',content:`Genera 5-7 idee creative e concrete su: "${task}". Solo lista numerata, breve.`}]),
+      callJ(buildSys('jarvis',ctx),[{role:'user',content:`Genera 5-7 idee creative e concrete su: "${task}". Solo lista numerata, breve.`}]),
+    ]);
+    appendMsg('virgilio',v1);appendMsg('jarvis',j1);
+    ws.lr='virgilio';updTyp();
+    const sl=await callV(buildSys('virgilio',ctx),[{role:'user',content:`Tema: "${task}"
+Idee Virgilio:
+${v1}
+Idee Jarvis:
+${j1}
+
+Seleziona le 3 migliori idee in assoluto. Per ognuna: nome breve, perché è la migliore, un rischio possibile. Formato decisionale chiaro.`}]);
+    appendMsg('synthesis',sl);
   }else{
     ws.lr='both';updTyp();
     const[v1,j1]=await Promise.all([callV(buildSys('virgilio',ctx),[{role:'user',content:task}]),callJ(buildSys('jarvis',ctx),[{role:'user',content:task}])]);
