@@ -592,7 +592,7 @@ ${st.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')
   const animStyle=animate?'opacity:0;animation:fu .28s ease forwards':'';
   if(m.role==='image'){
   return`<div class="bw" style="${animStyle}">
-<div class="brole" style="color:#a07040">DALL-E-2</div>
+<div class="brole" style="color:#a07040">gpt-image-1</div>
 <div class="img-wrap"><img src="${m.content}" style="max-width:100%;border-radius:8px;border:1px solid #1e1e1e;display:block;">
 <a href="${m.content}" target="_blank" class="img-btn">↗ apri</a></div>
 </div>`;
@@ -799,8 +799,10 @@ window.genImg=async()=>{
   addMsg('user','[Immagine] '+brief);
   ws.loading=true;ws.lr='jarvis';updUI();
   try{
-    const imgPrompt=await callJ([{role:'user',content:'Crea un prompt ottimale per DALL-E 2: "'+brief+'". Solo il prompt in inglese, max 200 caratteri.'}]);
-    const r=await fetch('https://api.openai.com/v1/images/generations',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.get('jKey')},body:JSON.stringify({model:'dall-e-2',prompt:imgPrompt,n:1,size:'1024x1024'})});
+    const imgPrompt=await callJ([{role:'user',content:'Crea un prompt ottimale per gpt-image-1
+: "'+brief+'". Solo il prompt in inglese, max 200 caratteri.'}]);
+    const r=await fetch('https://api.openai.com/v1/images/generations',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.get('jKey')},body:JSON.stringify({model:'gpt-image-1
+',prompt:imgPrompt,n:1,size:'1024x1024'})});
     const d=await r.json();
     if(d.error)throw new Error(d.error.message);
     addMsg('image',d.data[0].url);
