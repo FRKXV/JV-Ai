@@ -590,6 +590,14 @@ function rMsg(m, animate){
 ${st.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}
 </select></div>`:'';
   const animStyle=animate?'opacity:0;animation:fu .28s ease forwards':'';
+  if(m.role==='image'){
+  return`<div class="bw" style="${animStyle}">
+<div class="brole" style="color:#a07040">DALL·E</div>
+<div class="img-wrap"><img src="${m.content}" style="max-width:100%;border-radius:8px;border:1px solid #1e1e1e;display:block;">
+<a href="${m.content}" target="_blank" class="img-btn">↗ apri</a></div>
+</div>`;
+}
+
   return`<div class="bw${m.role==='user'?' r':''}" style="${animStyle}">
 <div class="brole" style="color:${RC[m.role]||'#606060'}">${RL[m.role]||m.role}</div>
 <div class="bb ${m.role}">${esc(m.content)}</div>
