@@ -161,7 +161,8 @@ const st={
   projects: S.get('projects',[]),
   gm: S.get('globalMemory',DEF_MEM),
   addTask:false, addBlocker:false, addDecision:false,
-  ws:{mode:'sequential',ctx:[],msgs:[],loading:false,lr:null,err:''},
+  sidebarOpen:true,
+  ws:{mode:'parallel',ctx:[],msgs:[],loading:false,lr:null,err:''},
 };
 
 const getP=id=>st.projects.find(p=>p.id===id);
@@ -206,7 +207,8 @@ function buildCtx(){
 function render(){
   const app=$('app'); if(!app)return;
   if(st.view==='setup'){app.innerHTML=rSetup();aSetup();return;}
-  app.innerHTML=`<div class="sidebar">${rSidebar()}</div><div class="main" id="mc"></div>`;
+  const sbStyle=st.sidebarOpen?'width:188px':'width:36px;overflow:hidden';
+  app.innerHTML=`<div class="sidebar" id="sb" style="${sbStyle}">${rSidebar()}</div><div class="main" id="mc"></div>`;
   renderMain();
 }
 function renderMain(){
@@ -219,7 +221,8 @@ function renderMain(){
   }
 }
 function nav(v){st.view=v;st.addTask=st.addBlocker=st.addDecision=false;render();}
-function rSb(){const sb=document.querySelector('.sidebar');if(sb)sb.innerHTML=rSidebar();}
+function rSb(){const sb=document.querySelector('.sidebar');if(sb){sb.innerHTML=rSidebar();sb.style.width=st.sidebarOpen?'188px':'36px';}}
+window.togSidebar=()=>{st.sidebarOpen=!st.sidebarOpen;render();};
 
 // ── Setup ────────────────────────────────────────────────
 function rSetup(){return`<div class="setup-wrap"><div class="setup-box">
@@ -250,7 +253,10 @@ function aSetup(){
 function rSidebar(){
   const v=st.view;
   const pj=st.projects.map(p=>`<button class="pj-btn${v==='project:'+p.id?' active':''}" onclick="nav('project:${p.id}')"><div class="pj-dot" style="background:${SC[p.status]||'#555'}"></div><span class="pj-nm">${esc(p.name)}</span></button>`).join('');
-  return`<div class="sb-head"><div class="sb-logo"><span class="lv">V</span><span class="lx">×</span><span class="lj">J</span></div><div class="sb-sub">Team AI Personale</div></div>
+  return`<div class="sb-head" style="display:flex;align-items:center;justify-content:space-between;">
+<div style="display:${st.sidebarOpen?'block':'none'}"><div class="sb-logo"><span class="lv">V</span><span class="lx">×</span><span class="lj">J</span></div><div class="sb-sub">Team AI Personale</div></div>
+<button onclick="togSidebar()" style="background:none;border:none;color:#555;font-size:.9rem;cursor:pointer;padding:2px 4px;flex-shrink:0;">${st.sidebarOpen?'◁':'▷'}</button>
+</div>
 <nav class="sb-nav">
 <button class="nav-btn${v==='dashboard'?' active':''}" onclick="nav('dashboard')"><span class="nav-ic">◉</span>Dashboard</button>
 <button class="nav-btn${v==='workspace'?' active':''}" onclick="nav('workspace')"><span class="nav-ic">⚡</span>Workspace</button>
@@ -389,11 +395,12 @@ const MODES=[{id:'sequential',ic:'⟶',lb:'Sequenziale'},{id:'debate',ic:'⚡',l
 function rWs(){
   const ws=st.ws;
   const mBtns=MODES.map(m=>`<button class="mode-btn${ws.mode===m.id?' active':''}" onclick="setWsMode('${m.id}')">${m.ic} ${m.lb}</button>`).join('');
+  const refreshBtn=`<button onclick="clearWs()" style="background:none;border:1px solid #1a1a1a;color:#444;font-size:.65rem;padding:3px 7px;border-radius:5px;cursor:pointer;font-family:'Courier New',monospace;margin-left:4px;" title="Pulisci chat">↺ clear</button>`;
   const cBtns=st.projects.map(p=>`<button class="ctx-btn${ws.ctx.includes(p.id)?' active':''}" onclick="togCtx('${p.id}')">${esc(p.name.slice(0,9))}</button>`).join('');
   const msgs=ws.msgs.map(rMsg).join('');
   const empty=!ws.msgs.length?`<div class="ws-empty"><div class="ws-logo"><span style="color:#5b9bd5">V</span><span style="color:#1a1a1a">×</span><span style="color:#d4a24c">J</span></div><span style="font-family:'Courier New',monospace;font-size:.7rem;color:#2a2a2a">Inserisci un task per avviare la collaborazione</span>${ws.ctx.length?`<br><br><span style="font-family:'Courier New',monospace;font-size:.6rem;color:#5bd58a">↗ ${ws.ctx.length} progett${ws.ctx.length===1?'o':'i'} nel contesto</span>`:''}</div>`:'';
   return`<div class="ws">
-<div class="ws-top">${mBtns}<span class="sep"></span><span class="ctx-lbl">CTX:</span>${cBtns||'<span style="font-family:Courier New,monospace;font-size:.56rem;color:#333">nessun progetto</span>'}</div>
+<div class="ws-top">${mBtns}${refreshBtn}<span class="sep"></span><span class="ctx-lbl">CTX:</span>${cBtns||'<span style="font-family:Courier New,monospace;font-size:.56rem;color:#333">nessun progetto</span>'}</div>
 <div class="ws-msgs" id="wm">${empty}${msgs}${ws.loading&&ws.lr==='both'?rTyp('virgilio')+rTyp('jarvis'):''}${ws.loading&&ws.lr&&ws.lr!=='both'?rTyp(ws.lr):''}${ws.err?`<div style="color:#d47a7a;font-size:.74rem;padding:5px 0;font-family:Courier New,monospace">${esc(ws.err)}</div>`:''}</div>
 <div class="ws-bar"><div class="ws-inner">
 <textarea class="ws-ta" id="ws-ta" rows="2" placeholder="Task, domanda, analisi... (Invio = invia · Shift+Invio = a capo)"></textarea>
@@ -455,15 +462,13 @@ async function subWs(){
 async function runWs(task){
   const ws=st.ws,ctx=buildCtx();
   if(ws.mode==='sequential'){
-    ws.lr='virgilio';updTyp();
-    const v1=await callV(buildSys('virgilio',ctx),[{role:'user',content:task}]);
-    appendMsg('virgilio',v1);
+    let v1='';
+    try{ws.lr='virgilio';updTyp();v1=await callV(buildSys('virgilio',ctx),[{role:'user',content:task}]);appendMsg('virgilio',v1);}
+    catch(e){appendMsg('virgilio','[Virgilio non disponibile]');}
     ws.lr='jarvis';updTyp();
-    const j1=await callJ(buildSys('jarvis',ctx),[{role:'user',content:`Task: "${task}"\n\nVirgilio:\n${v1}\n\nCritica, integra, aggiungi strategia. Non ripetere.`}]);
+    const j1=await callJ(buildSys('jarvis',ctx),[{role:'user',content:v1?`Task: "${task}"\n\nVirgilio:\n${v1}\n\nCritica, integra, aggiungi strategia. Non ripetere.`:task}]);
     appendMsg('jarvis',j1);
-    ws.lr='virgilio';updTyp();
-    const syn=await callV(buildSys('virgilio',ctx),[{role:'user',content:`Task: "${task}"\nVirgilio: ${v1}\nJarvis: ${j1}\n\nSintesi finale: risposta ottimale, concisa, actionable.`}]);
-    appendMsg('synthesis',syn);
+    if(v1){try{ws.lr='virgilio';updTyp();const syn=await callV(buildSys('virgilio',ctx),[{role:'user',content:`Task: "${task}"\nVirgilio: ${v1}\nJarvis: ${j1}\n\nSintesi finale: risposta ottimale, concisa, actionable.`}]);appendMsg('synthesis',syn);}catch(e){}}
   }else if(ws.mode==='debate'){
     ws.lr='virgilio';updTyp();
     const v1=await callV(buildSys('virgilio',ctx),[{role:'user',content:`Argomenta una posizione chiara su: "${task}". Sii assertivo.`}]);
@@ -496,6 +501,7 @@ Seleziona le 3 migliori idee in assoluto. Per ognuna: nome breve, perché è la 
     appendMsg('virgilio',v1);appendMsg('jarvis',j1);
   }
 }
+window.clearWs=()=>{st.ws.msgs=[];st.ws.err='';renderMain();};
 window.setWsMode=m=>{st.ws.mode=m;document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.textContent.trim().includes(MODES.find(x=>x.id===m)?.lb)));};
 window.togCtx=pid=>{const ws=st.ws;ws.ctx=ws.ctx.includes(pid)?ws.ctx.filter(x=>x!==pid):[...ws.ctx,pid];const b=document.querySelector(`[onclick="togCtx('${pid}')"]`);if(b)b.classList.toggle('active',ws.ctx.includes(pid));};
 window.saveToP=(pid,mid)=>{if(!pid)return;const p=getP(pid);if(!p)return;const m=st.ws.msgs.find(m=>m.id===mid);if(!m)return;const stamp=new Date().toLocaleDateString('it-IT');p.memory=((p.memory||'').trim()+`\n\n[${stamp}]\n${m.content.slice(0,400)}`).trim();saveP();alert('Salvato in "'+p.name+'"');};
