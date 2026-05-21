@@ -156,6 +156,9 @@ textarea,input,select{font-family:inherit;outline:none;}
 .wsnd:disabled{background:#181818;color:#333;cursor:not-allowed;}
 .wsnd:not(:disabled){background:linear-gradient(135deg,#1a3f6a,#6a3a10);}
 
+.img-wrap{margin-top:6px;}
+.img-wrap img{max-width:100%;border-radius:8px;border:1px solid #1e1e1e;display:block;}
+.img-btn{padding:3px 8px;border-radius:4px;border:1px solid #1e1e1e;background:transparent;color:#888;font-size:.62rem;margin-top:5px;cursor:pointer;}
 /* ── Animations ── */
 @keyframes fu{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 @keyframes dp{0%,100%{opacity:.2;transform:scale(.75);}50%{opacity:1;transform:scale(1.25);}}
@@ -556,6 +559,8 @@ ${ws.ctx.length?`<div style="margin-top:6px;font-family:'Courier New',monospace;
 <div class="wt">
   ${mBtns}
   <button class="clr" onclick="clearWs()">↺ clear</button>
+  <button class="clr" onclick="genImg()" style="color:#a07040;border-color:#2a1800">🖼 immagine</button>
+
   <span class="sp"></span>
   <span class="ctxl">CTX:</span>
   ${cBtns||'<span style="font-family:Courier New,monospace;font-size:.52rem;color:#252525">nessun progetto</span>'}
@@ -778,6 +783,21 @@ window.saveToP=(pid,mid)=>{
   p.memory=((p.memory||'').trim()+`\n\n[${stamp}]\n${m.content.slice(0,400)}`).trim();
   saveP();
   alert('Salvato in "'+p.name+'"');
+};
+window.genImg=async()=>{
+  const brief=prompt('Descrivi cosa vuoi generare:');
+  if(!brief||!brief.trim())return;
+  const ws=st.ws;
+  addMsg('user','[Immagine] '+brief);
+  ws.loading=true;ws.lr='jarvis';updUI();
+  try{
+    const imgPrompt=await callJ([{role:'user',content:'Crea un prompt ottimale per DALL-E 3: "'+brief+'". Solo il prompt in inglese, max 200 caratteri.'}]);
+    const r=await fetch('https://api.openai.com/v1/images/generations',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.get('jKey')},body:JSON.stringify({model:'dall-e-3',prompt:imgPrompt,n:1,size:'1024x1024'})});
+    const d=await r.json();
+    if(d.error)throw new Error(d.error.message);
+    addMsg('image',d.data[0].url);
+  }catch(e){ws.err=e.message;}
+  ws.loading=false;ws.lr=null;updUI();
 };
 
 render();
