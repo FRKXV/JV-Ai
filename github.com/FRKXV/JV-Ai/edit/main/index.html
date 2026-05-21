@@ -288,7 +288,9 @@ async function callDalle(prompt){
   });
   const d=await r.json();
   if(d.error) throw new Error('DALL-E: '+d.error.message);
-  return d.data?.[0]?.url||'';
+  const img=d.data?.[0];
+  if(!img) throw new Error('DALL-E: nessuna immagine ricevuta');
+  return img.url||('data:image/png;base64,'+img.b64_json)||'';
 }
 // ════════════════════════════════════════════
 // RENDER ENGINE
