@@ -156,9 +156,12 @@ textarea,input,select{font-family:inherit;outline:none;}
 .wsnd:disabled{background:#181818;color:#333;cursor:not-allowed;}
 .wsnd:not(:disabled){background:linear-gradient(135deg,#1a3f6a,#6a3a10);}
 
+
+/* ── Image ── */
 .img-wrap{margin-top:6px;}
 .img-wrap img{max-width:100%;border-radius:8px;border:1px solid #1e1e1e;display:block;}
 .img-btn{padding:3px 8px;border-radius:4px;border:1px solid #1e1e1e;background:transparent;color:#888;font-size:.62rem;margin-top:5px;cursor:pointer;}
+.img-btn:hover{color:#ccc;border-color:#333}
 /* ── Animations ── */
 @keyframes fu{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 @keyframes dp{0%,100%{opacity:.2;transform:scale(.75);}50%{opacity:1;transform:scale(1.25);}}
@@ -269,6 +272,25 @@ async function callJ(messages){
   return d.choices?.[0]?.message?.content||'';
 }
 
+
+async function callDalle(prompt){
+  const key=S.get('jKey');
+  if(!key) throw new Error('OpenAI key mancante');
+  const r=await fetch('https://api.openai.com/v1/images/generations',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body:JSON.stringify({
+      model:'gpt-image-1',
+      prompt:prompt,
+      n:1,
+      size:'1024x1024',
+      quality:'standard'
+    }),
+  });
+  const d=await r.json();
+  if(d.error) throw new Error('DALL-E: '+d.error.message);
+  return d.data?.[0]?.url||'';
+}
 // ════════════════════════════════════════════
 // RENDER ENGINE
 // ════════════════════════════════════════════
@@ -301,7 +323,28 @@ function attachMain(){
 function nav(v){
   st.view=v;
   st.addTask=st.addBlocker=st.addDecision=false;
-  render();
+  
+window.genImg=async()=>{
+  const brief=prompt('Descrivi cosa vuoi generare:');
+  if(!brief||!brief.trim())return;
+  const ws=st.ws;
+  ws.loading=true;ws.lr='jarvis';updUI();
+  addMsg('user','[Immagine] '+brief);
+  try{
+    // Jarvis ottimizza il prompt
+    const imgPrompt=await callJ([{role:'user',content:'Crea un prompt ottimale per DALL-E 3 basato su questa richiesta: "'+brief+'". Rispondi SOLO con il prompt in inglese, max 200 caratteri, senza spiegazioni.'}]);
+    ws.lr=null;updUI();
+    // Genera immagine
+    ws.loading=true;
+    const url=await callDalle(imgPrompt);
+    addMsg('image',url);
+  }catch(e){
+    ws.err=e.message;
+  }
+  ws.loading=false;ws.lr=null;updUI();
+};
+
+render();
 }
 
 // ════════════════════════════════════════════
@@ -560,7 +603,6 @@ ${ws.ctx.length?`<div style="margin-top:6px;font-family:'Courier New',monospace;
   ${mBtns}
   <button class="clr" onclick="clearWs()">↺ clear</button>
   <button class="clr" onclick="genImg()" style="color:#a07040;border-color:#2a1800">🖼 immagine</button>
-
   <span class="sp"></span>
   <span class="ctxl">CTX:</span>
   ${cBtns||'<span style="font-family:Courier New,monospace;font-size:.52rem;color:#252525">nessun progetto</span>'}
@@ -581,8 +623,8 @@ ${ws.ctx.length?`<div style="margin-top:6px;font-family:'Courier New',monospace;
 }
 
 function rMsg(m, animate){
-  const RC={virgilio:'#5b9bd5',jarvis:'#d4a24c',synthesis:'#5bd58a',user:'#606060'};
-  const RL={virgilio:'Virgilio',jarvis:'Jarvis',synthesis:'Sintesi',user:'Alessandro'};
+  const RC={virgilio:'#5b9bd5',jarvis:'#d4a24c',synthesis:'#5bd58a',user:'#606060',image:'#a07040'};
+  const RL={virgilio:'Virgilio',jarvis:'Jarvis',synthesis:'Sintesi',user:'Alessandro',image:'DALL·E'};
   const saveHtml=m.role==='synthesis'?`<div class="savr">
 <span style="font-family:'Courier New',monospace;font-size:.52rem;color:#303030">Salva in:</span>
 <select class="savs" onchange="saveToP(this.value,'${m.id}')">
@@ -591,13 +633,12 @@ ${st.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')
 </select></div>`:'';
   const animStyle=animate?'opacity:0;animation:fu .28s ease forwards':'';
   if(m.role==='image'){
-  return`<div class="bw" style="${animStyle}">
-<div class="brole" style="color:#a07040">gpt-image-1</div>
-<div class="img-wrap"><img src="${m.content}" style="max-width:100%;border-radius:8px;border:1px solid #1e1e1e;display:block;">
-<a href="${m.content}" target="_blank" class="img-btn">↗ apri</a></div>
+    return`<div class="bw" style="${animStyle}">
+<div class="brole" style="color:${RC.image}">DALL·E</div>
+<div class="img-wrap"><img src="${esc(m.content)}" alt="immagine generata">
+<a href="${esc(m.content)}" download="vjteam-img.png" class="img-btn">↓ scarica</a></div>
 </div>`;
-}
-
+  }
   return`<div class="bw${m.role==='user'?' r':''}" style="${animStyle}">
 <div class="brole" style="color:${RC[m.role]||'#606060'}">${RL[m.role]||m.role}</div>
 <div class="bb ${m.role}">${esc(m.content)}</div>
@@ -753,7 +794,28 @@ async function runShortlist(task){
 // GLOBAL ACTIONS
 // ════════════════════════════════════════════
 window.nav=nav;
-window.togSb=()=>{st.sbOpen=!st.sbOpen;render();};
+window.togSb=()=>{st.sbOpen=!st.sbOpen;
+window.genImg=async()=>{
+  const brief=prompt('Descrivi cosa vuoi generare:');
+  if(!brief||!brief.trim())return;
+  const ws=st.ws;
+  ws.loading=true;ws.lr='jarvis';updUI();
+  addMsg('user','[Immagine] '+brief);
+  try{
+    // Jarvis ottimizza il prompt
+    const imgPrompt=await callJ([{role:'user',content:'Crea un prompt ottimale per DALL-E 3 basato su questa richiesta: "'+brief+'". Rispondi SOLO con il prompt in inglese, max 200 caratteri, senza spiegazioni.'}]);
+    ws.lr=null;updUI();
+    // Genera immagine
+    ws.loading=true;
+    const url=await callDalle(imgPrompt);
+    addMsg('image',url);
+  }catch(e){
+    ws.err=e.message;
+  }
+  ws.loading=false;ws.lr=null;updUI();
+};
+
+render();};
 window.doReset=()=>{if(!confirm('Resettare le API key?'))return;S.del('vKey');S.del('jKey');nav('setup');};
 
 window.newProj=()=>{
@@ -792,21 +854,25 @@ window.saveToP=(pid,mid)=>{
   saveP();
   alert('Salvato in "'+p.name+'"');
 };
+
+
 window.genImg=async()=>{
   const brief=prompt('Descrivi cosa vuoi generare:');
   if(!brief||!brief.trim())return;
   const ws=st.ws;
-  addMsg('user','[Immagine] '+brief);
   ws.loading=true;ws.lr='jarvis';updUI();
+  addMsg('user','[Immagine] '+brief);
   try{
-    const imgPrompt=await callJ([{role:'user',content:'Crea un prompt ottimale per gpt-image-1
-: "'+brief+'". Solo il prompt in inglese, max 200 caratteri.'}]);
-    const r=await fetch('https://api.openai.com/v1/images/generations',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.get('jKey')},body:JSON.stringify({model:'gpt-image-1
-',prompt:imgPrompt,n:1,size:'1024x1024'})});
-    const d=await r.json();
-    if(d.error)throw new Error(d.error.message);
-    addMsg('image',d.data[0].url);
-  }catch(e){ws.err=e.message;}
+    // Jarvis ottimizza il prompt
+    const imgPrompt=await callJ([{role:'user',content:'Crea un prompt ottimale per DALL-E 3 basato su questa richiesta: "'+brief+'". Rispondi SOLO con il prompt in inglese, max 200 caratteri, senza spiegazioni.'}]);
+    ws.lr=null;updUI();
+    // Genera immagine
+    ws.loading=true;
+    const url=await callDalle(imgPrompt);
+    addMsg('image',url);
+  }catch(e){
+    ws.err=e.message;
+  }
   ws.loading=false;ws.lr=null;updUI();
 };
 
